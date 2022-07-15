@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: web
+  name: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - image: my_amazing_tool/web-app
+        imagePullPolicy: Never
+        name: web-app
+        env:
+        - name: MONGODB_HOST
+          value: mongo-nodeport-svc
+        - name: MONGODB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: mongo-conf
+              key: port
+        - name: MONGODB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongo-creds
+              key: username
+        - name: MONGODB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongo-creds
+              key: password
+        - name: MONGODB_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: mongo-conf
+              key: database
+        - name: MONGODB_COLLECTION
+          valueFrom:
+            configMapKeyRef:
+              name: mongo-conf
+              key: collection
+        resources:
+          limits:
+            memory: "50Mi"
+            cpu: "500m"
