@@ -21,7 +21,7 @@ collection = db[os.environ.get('MONGODB_COLLECTION')]
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     try: 
-        content = collection.find_one()['message']
+        content = collection.find_one({'input': 'user'})['message']
         return content
-    except KeyError:
+    except (KeyError, TypeError):
         return WELCOME_MSG
