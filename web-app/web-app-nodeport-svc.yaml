@@ -3,7 +3,7 @@ kind: Service
 metadata:
   labels:
     app: web
-  name: web-nodeport-svc
+  name: web-app
 spec:
   ports:
   - port: 80
