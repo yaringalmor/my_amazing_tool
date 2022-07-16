@@ -1,3 +1,9 @@
+# My amazing tool ignore files
+web-app/.env
+web-app/docker-compose.yaml
+archive
+externals
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
