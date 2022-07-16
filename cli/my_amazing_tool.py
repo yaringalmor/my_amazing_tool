@@ -1,51 +1,35 @@
 import docker
 import kubernetes
 import os
-from argparse import ArgumentParser
+import re
+import requests
 from pymongo import MongoClient
-from shutil import which
 
-from common import (exec_cmd,
+from common import (create_parser,
+                    exec_cmd,
+                    get_service_url,
                     greetings,
+                    is_tool_exists,
                     print_phase_start,
                     print_tool_installed,
                     print_tool_not_installed,
                     print_verify_tool,
+                    verify_tool,
                     WEB_APP_IMAGE_TAG,
                     WEB_APP_SERVICE_NAME,
+                    MONGODB_SERVICE_NAME,
+                    MONGODB_DETAILS,
                     DOCUMENT_QUERY)
-
-def create_parser():
-    parser = ArgumentParser(description='Set website with preffered content')
-    parser.add_argument('content', type=str, help='Content to be displayed on website.')
-
-    return parser
-
-def is_tool_exists(name):
-    return which(name) is not None
-
-def verify_tool(name):
-    print_verify_tool(name)
-    if not is_tool_exists(name):
-        print_tool_not_installed(name)
-        raise EnvironmentError("Please refer README installation guide.")
-    print_tool_installed(name)
 
 def initialize_kubernetes_cluster():
     print_phase_start("Kubernetes cluster initialize")
     exec_cmd("minikube start --driver=docker")
-
-
-def eval_docker_env():
-    exec_cmd("eval $(minikube -p minikube docker-env)", shell=True)
 
 def verify_cluster_exists():
     try: 
         contexts, _ = kubernetes.config.list_kube_config_contexts()
     except kubernetes.config.config_exception.ConfigException:
         initialize_kubernetes_cluster()
-        
-    eval_docker_env()
 
 def verify_minukube():
     print_phase_start("Verify minikube setup")
@@ -76,17 +60,31 @@ def initialize_setup():
     deploy_mongodb()
     delpoy_web_app()
 
+def get_mongo_service_details():
+    k8s_service_url_regex = re.compile('http://(.*):([0-9]{5})')
+    service_url = get_service_url(MONGODB_SERVICE_NAME)
+
+    service_url_match = k8s_service_url_regex.match(service_url)
+    if service_url_match:
+        mongodb_host = service_url_match.group(1)
+        mongodb_port = int(service_url_match.group(2))
+        return mongodb_host, mongodb_port
+    
+    raise RuntimeError("Failed to detect MongoDB service details")
+
+
 def initialize_db_client():
-    mongo_client = MongoClient(host=os.environ.get('MONGODB_HOST'),
-                     port=int(os.environ.get('MONGODB_PORT')),
-                     username=os.environ.get('MONGODB_USERNAME'),
-                     password=os.environ.get('MONGODB_PASSWORD'))
+    mongodb_host, mongodb_port = get_mongo_service_details()
+    mongo_client = MongoClient(host=mongodb_host,
+                               port=int(mongodb_port),
+                               username=MONGODB_DETAILS['creds']['username'],
+                               password= MONGODB_DETAILS['creds']['password'])
     return mongo_client
 
 def update_document_content(content):
     cursor = initialize_db_client()
-    db_name = os.environ.get('MONGODB_DATABASE')
-    collection_name = os.environ.get('MONGODB_COLLECTION')
+    db_name = MONGODB_DETAILS['db']
+    collection_name = MONGODB_DETAILS['collection']
     collection = cursor[db_name][collection_name]
 
     if collection.find_one(DOCUMENT_QUERY):
@@ -96,14 +94,21 @@ def update_document_content(content):
     else:
         cursor[db_name][collection_name].insert_one({'input': 'user',
                                                      'message': content})
+def validate_web_app_content(content):
+    service_url = get_service_url(WEB_APP_SERVICE_NAME)
+    res = requests.get(service_url)
+    web_app_content = res.content.decode('utf-8')
+    if content != web_app_content:
+        raise RuntimeError("Web app failed to load content from db")
 
 def display_web_app_url():
-    service_url, _ = exec_cmd(f'minikube service {WEB_APP_SERVICE_NAME} --url',return_output=True)
-    print(f'Browse the following link to access web-app - CLICK HERE -> {service_url.decode("utf-8")}')
+    service_url = get_service_url(WEB_APP_SERVICE_NAME)
+    print(f'Browse the following link to access web-app - CLICK HERE -> {service_url}')
 
 def update_web_content(content):
     print_phase_start("Set web content")
     update_document_content(content)
+    validate_web_app_content(content)
     display_web_app_url()   
 
 
