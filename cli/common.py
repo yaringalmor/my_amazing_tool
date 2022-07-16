@@ -1,47 +1,13 @@
 import shlex
 import subprocess
+from argparse import ArgumentParser
 from emoji import emojize
-from random import choice
+from shutil import which
 
 emojies = {
-    'stressed': [':worried_face:',
-                 ':man_shrugging_medium_skin_tone:',
-                 ':man_getting_massage_light_skin_tone:',
-                 ':man_frowning_dark_skin_tone:',
-                 ':mage_light_skin_tone:',
-                 ':hushed_face:',
-                 ':frowning_face_with_open_mouth:',
-                 ':confused_face:',
-                 ':check_mark_button:',
-                 ':anxious_face_with_sweat:'],
-    'relifed': [':nerd_face:',
-                ':man_tipping_hand_medium_skin_tone:',
-                 ':man_dancing_light_skin_tone:',
-                 ':man_cartwheeling_light_skin_tone:',
-                 ':kissing_face_with_smiling_eyes:',
-                 ':grinning_face_with_sweat:',
-                 ':face_without_mouth:',
-                 ':face_savoring_food:'
-                 ':crown:',
-                 ':cowboy_hat_face:',
-                 ':beaming_face_with_smiling_eyes:'],                 
-    'panic': [':woozy_face:',
-              ':nauseated_face:',
-              ':man_mechanic_medium-light_skin_tone:',
-              ':man_gesturing_NO_medium-light_skin_tone:',
-              ':man_facepalming_medium_skin_tone:',
-              ':man_bowing_dark_skin_tone:',
-              ':lying_face:',
-              '	:loudly_crying_face:',
-              ':face_with_spiral_eyes:',
-              ':face_with_rolling_eyes:',
-              ':face_with_steam_from_nose:',
-              ':face_with_head-bandage:',
-              ':downcast_face_with_sweat:',
-              ':disappointed_face:',
-              ':crying_face:',
-              ':bomb:',
-              ':anguished_face:']
+    'stressed': ':magnifying_glass_tilted_right:',    
+    'relifed': ':check_mark_button:',
+    'panic': ':man_gesturing_NO_medium-light_skin_tone:'    
 }
 
 installation_links = {
@@ -50,11 +16,27 @@ installation_links = {
     'python': 'https://www.python.org/downloads'
 }
 
-WEB_APP_IMAGE_TAG = 'web-app'
+DOCUMENT_QUERY = {'input': 'user'}
+
+MONGODB_DETAILS = {
+                    'db': 'my_amazing_tool',
+                    'collection': 'data',
+                    'creds': {
+                        'username': 'adminuser',
+                        'password': 'password123'
+                    }
+                  }
+
+MONGODB_SERVICE_NAME = 'mongo-nodeport-svc'
+
+WEB_APP_IMAGE_TAG = 'my_amazing_tool/web-app'
 
 WEB_APP_SERVICE_NAME = 'web-app'
 
-DOCUMENT_QUERY = {'input': 'user'}
+def create_parser():
+    parser = ArgumentParser(description='Set website with preffered content')
+    parser.add_argument('content', type=str, help='Content to be displayed on website.')
+    return parser
 
 def exec_cmd(cmd, shell=False, return_output=False):
     subprocess_command = cmd if shell else shlex.split(cmd)
@@ -65,19 +47,33 @@ def exec_cmd(cmd, shell=False, return_output=False):
     else:
         subprocess.run(subprocess_command, shell=shell).check_returncode()
 
+def get_service_url(service_name):
+    service_url, _ = exec_cmd(f'minikube service {service_name} --url',return_output=True)
+    return service_url.decode('utf-8')
+
 def greetings():
     print('\n\n*** Done! Thanks for choosing My Amazing Tool. ***')
 
+def is_tool_exists(name):
+    return which(name) is not None
+
 def print_verify_tool(name):
-    print(emojize(f'{choice(emojies["stressed"])}  Verify {name} is installed'))
+    print(emojize(f'{emojies["stressed"]}  Verify {name} is installed'))
 
 def print_tool_installed(name):
-    print(emojize(f'{choice(emojies["relifed"])}  {name} is installed and well configured'))
+    print(emojize(f'{emojies["relifed"]}  {name} is installed and well configured'))
 
 def print_tool_not_installed(name, installation_link):
-    print(emojize(f"""{choice(emojies["panic"])}  {name} is not installed or could not be found.
+    print(emojize(f"""{emojies["panic"]}  {name} is not installed or could not be found.
 Please refer {name} installation guide:
 {installation_link[name]}"""))
 
 def print_phase_start(name):
     print(f'\n=== Starting phase: {name} ===')
+
+def verify_tool(name):
+    print_verify_tool(name)
+    if not is_tool_exists(name):
+        print_tool_not_installed(name)
+        raise EnvironmentError("Please refer README installation guide.")
+    print_tool_installed(name)
